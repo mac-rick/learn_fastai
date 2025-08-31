@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bear Classifier</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            text-align: center;
+        }
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            padding: 40px;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .upload-area:hover {
+            background-color: #f9f9f9;
+        }
+        .upload-btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        .upload-btn:hover {
+            background-color: #45a049;
+        }
+        .result {
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 5px;
+            background-color: #f0f0f0;
+        }
+        .error {
+            color: red;
+            background-color: #ffebee;
+        }
+        .success {
+            color: green;
+            background-color: #e8f5e8;
+        }
+        #imagePreview {
+            max-width: 400px;
+            max-height: 300px;
+            margin: 20px auto;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>🐻 Bear Image Classifier</h1>
+    <p>Upload an image to classify what type of bear it is!</p>
+    
+    <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+        <p>Click here to select an image or drag and drop</p>
+        <input type="file" id="fileInput" accept="image/*" style="display: none;">
+    </div>
+    
+    <img id="imagePreview" alt="Preview">
+    
+    <button class="upload-btn" onclick="uploadImage()" id="uploadBtn" disabled>
+        Classify Image
+    </button>
+    
+    <div id="result"></div>
+    
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const imagePreview = document.getElementById('imagePreview');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const result = document.getElementById('result');
+        
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    imagePreview.src = e.target.result;
+                    imagePreview.style.display = 'block';
+                    uploadBtn.disabled = false;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+        
+        function uploadImage() {
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('Please select an image first!');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            uploadBtn.innerHTML = 'Classifying...';
+            uploadBtn.disabled = true;
+            result.innerHTML = '';
+            
+            fetch('/predict', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                uploadBtn.innerHTML = 'Classify Image';
+                uploadBtn.disabled = false;
+                
+                if (data.error) {
+                    result.innerHTML = `<div class="result error"><strong>Error:</strong> ${data.error}</div>`;
+                } else {
+                    let probsHtml = '';
+                    for (const [className, prob] of Object.entries(data.all_probabilities)) {
+                        const percentage = (prob * 100).toFixed(1);
+                        probsHtml += `<p><strong>${className}:</strong> ${percentage}%</p>`;
+                    }
+                    
+                    result.innerHTML = `
+                        <div class="result success">
+                            <h3>🎯 Prediction: ${data.prediction}</h3>
+                            <p><strong>Confidence:</strong> ${(data.confidence * 100).toFixed(1)}%</p>
+                            <hr>
+                            <h4>All Probabilities:</h4>
+                            ${probsHtml}
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                uploadBtn.innerHTML = 'Classify Image';
+                uploadBtn.disabled = false;
+                result.innerHTML = `<div class="result error"><strong>Error:</strong> ${error}</div>`;
+            });
+        }
+        
+        // Drag and drop functionality
+        const uploadArea = document.querySelector('.upload-area');
+        
+        uploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            uploadArea.style.backgroundColor = '#f0f0f0';
+        });
+        
+        uploadArea.addEventListener('dragleave', function(e) {
+            uploadArea.style.backgroundColor = '';
+        });
+        
+        uploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            uploadArea.style.backgroundColor = '';
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                fileInput.dispatchEvent(new Event('change'));
+            }
+        });
+    </script>
+</body>
+</html>
